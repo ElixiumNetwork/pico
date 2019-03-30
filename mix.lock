@@ -1,0 +1,3 @@
+%{
+  "strap": {:hex, :strap, "0.1.1", "90fedb0b51a1c81678cc1386ed9d3d9e6126ac718af4de2a852d730c0fc6d67f", [:mix], [], "hexpm"},
+}
