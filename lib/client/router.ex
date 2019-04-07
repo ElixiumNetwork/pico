@@ -19,6 +19,10 @@ defmodule Pico.Client.Router do
     shared_master_key
   end
 
+  def message("HELLO", data, state) do
+    IO.inspect(data, label: "Data")
+  end
+
   def message(opname, _data, _state) do
     IO.puts "Received unknown message #{opname}. Terminating connection"
     Process.exit(self(), :normal)

@@ -1,16 +1,16 @@
 defmodule Pico.Protocol.Decoder do
 
-  def decode(msg, secret \\ nil)
+  def decode(msg, secret \\ nil, iv \\ nil)
 
-  def decode(<<"PICO", major::bytes-size(1), minor::bytes-size(1), body::binary>>, secret) do
-    <<major::integer-8-unsigned>> = major
-    <<minor::integer-8-unsigned>> = minor
+  def decode(<<"PICO", major_b::bytes-size(1), minor_b::bytes-size(1), ciphertag::bytes-size(16), body::binary>>, key, iv) do
+    <<major::integer-8-unsigned>> = major_b
+    <<minor::integer-8-unsigned>> = minor_b
 
     {version, _} = Float.parse("#{major}.#{minor}")
 
     body =
-      if secret do
-        :crypto.block_decrypt(:aes_ecb, secret, body)
+      if key do
+        :crypto.block_decrypt(:aes_gcm, key, iv, {<<major, minor>>, body, ciphertag})
       else
         body
       end
@@ -27,7 +27,7 @@ defmodule Pico.Protocol.Decoder do
     {opname, data}
   end
 
-  def decode(s, _) do
+  def decode(s, _, _) do
     {:error, :protocol_mismatch}
   end
 

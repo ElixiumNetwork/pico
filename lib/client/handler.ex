@@ -38,7 +38,7 @@ defmodule Pico.Client.Handler do
     # this way we dont trigger the handler again.
     :inet.setopts(state.socket, active: false)
 
-    {opname, data} = Decoder.decode(message, state.secret)
+    {opname, data} = Decoder.decode(message, state.key, state.iv)
 
     apply(state.router, :message, [opname, data, state])
 
@@ -50,27 +50,24 @@ defmodule Pico.Client.Handler do
   def handle_cast(:accept_inbound_connection, state) do
     {:ok, socket} = :gen_tcp.accept(state.listen_socket)
 
-    secret = authenticate_inbound(socket, state.router)
+    {key, iv} = authenticate_inbound(socket, state.router)
 
-    state = Map.merge(state, %{
-      socket: socket,
-      secret: secret
-    })
+    state = Map.merge(state, %{socket: socket, key: key, iv: iv})
 
     :inet.setopts(socket, active: true)
 
     {:noreply, state}
   end
 
-  @spec authenticate_inbound(pid, atom) :: binary | {:error, :closed}
+  @spec authenticate_inbound(pid, atom) :: {binary, binary} | {:error, :closed}
   defp authenticate_inbound(socket, router) do
     case :gen_tcp.recv(socket, 0) do
       {:ok, message} ->
         {opname, data} = Decoder.decode(message)
 
-        <<shared_secret::binary-size(32)>> <> _ = apply(router, :message, [opname, data, socket])
+        <<key::binary-size(32), iv::binary-size(16), _rest::binary>> = apply(router, :message, [opname, data, socket])
 
-        shared_secret
+        {key, iv}
 
       {:error, :closed} -> Process.exit(self(), :normal)
     end

@@ -4,7 +4,7 @@ defmodule Pico do
   Documentation for Pico.
   """
 
-  @type connection :: {pid, binary}
+  @type connection :: {pid, binary, binary}
 
   @doc """
     Attempt a connection to the given IP address on the given port. This
@@ -36,9 +36,9 @@ defmodule Pico do
 
         {:ok, shared_secret} = Strap.session_key(client, peer_public_value)
 
-        <<shared_secret::binary-size(32)>> <> _ = shared_secret
+        <<key::binary-size(32), iv::binary-size(16), _rest::binary>> = shared_secret
 
-        {:ok, {socket, shared_secret}}
+        {:ok, {socket, key, iv}}
       e -> e
     end
   end
@@ -61,9 +61,9 @@ defmodule Pico do
     Send a message containing only an OpName to a connection.
   """
   @spec message(connection, String.t) :: :ok | {:error, String.t}
-  def message({socket, key}, opname) do
+  def message({socket, key, iv}, opname) do
     opname
-    |> encode(key)
+    |> encode(key, iv)
     |> send_message(socket)
   end
 
@@ -77,10 +77,10 @@ defmodule Pico do
     Send a message to a connection.
   """
   @spec message(connection, String.t, map) :: :ok | {:error, String.t}
-  def message({socket, key}, opname, data) do
-    opname
-    |> encode(data, key)
-    |> send_message(socket)
+  def message({socket, key, iv}, opname, data) do
+    encoded = encode(opname, data, key, iv)
+
+    send_message(encoded, socket)
   end
 
   def message(socket, opname, data) do
@@ -89,11 +89,11 @@ defmodule Pico do
     |> send_message(socket)
   end
 
-  @spec encode(String.t, binary) :: binary | {:error, String.t}
-  def encode(opname, key), do: Encoder.encode(opname, <<0>>, key)
+  @spec encode(String.t, binary, binary) :: binary | {:error, String.t}
+  def encode(opname, key, iv), do: Encoder.encode(opname, <<0>>, key, iv)
 
-  @spec encode(String.t, map, binary) :: binary | {:error, String.t}
-  def encode(opname, data, key), do: Encoder.encode(opname, data, key)
+  @spec encode(String.t, map, binary, binary) :: binary | {:error, String.t}
+  def encode(opname, data, key, iv), do: Encoder.encode(opname, data, key, iv)
 
   @spec send_message(binary, pid) :: :ok | tuple
   defp send_message(message, socket), do: :gen_tcp.send(socket, message)

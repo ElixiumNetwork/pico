@@ -11,36 +11,39 @@ defmodule Pico.Protocol.Encoder do
     encode_formatted(opname, formatted_data)
   end
 
-  def encode(opname, _, _) when not is_binary(opname) do
+  def encode(opname, _, _, _) when not is_binary(opname) do
     {:error, "OpName must be a string"}
   end
 
-  def encode(opname, <<0>>, key), do: encode_formatted(opname, <<0>>, key)
+  def encode(opname, <<0>>, key, iv), do: encode_formatted(opname, <<0>>, key, iv)
 
-  def encode(opname, data, key) when is_map(data) do
+  def encode(opname, data, key, iv) when is_map(data) do
     formatted_data = :erlang.term_to_binary(data)
-    encode_formatted(opname, formatted_data, key)
+
+    encode_formatted(opname, formatted_data, key, iv)
   end
 
-  defp encode_formatted(opname, data, key) do
+  defp encode_formatted(opname, data, key, iv) do
     body = Pico.Utilities.pad(opname <> "|" <> data, 32)
 
-    encrypted_body = :crypto.block_encrypt(:aes_ecb, key, body)
-    header = generate_header(encrypted_body)
+    {major, minor} = Application.get_env(:pico, :protocol_version)
 
-    header <> encrypted_body
+    version = <<major::integer-8-unsigned, minor::integer-8-unsigned>>
+
+    {encrypted_body, ciphertag} = :crypto.block_encrypt(:aes_gcm, key, iv, {version, body, 16})
+
+    "PICO" <> version <> ciphertag <> encrypted_body
   end
 
   defp encode_formatted(opname, data) do
     body = opname <> "|" <> data
-    header = generate_header(body)
 
-    header <> body
-  end
-
-  defp generate_header(body) do
     {major, minor} = Application.get_env(:pico, :protocol_version)
 
-    <<"PICO", major::integer-8-unsigned, minor::integer-8-unsigned>>
+    version = <<major::integer-8-unsigned, minor::integer-8-unsigned>>
+
+    ciphertag = String.duplicate(<<0>>, 16)
+
+    "PICO" <> version <> ciphertag <> body
   end
 end
