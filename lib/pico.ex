@@ -46,15 +46,27 @@ defmodule Pico do
   @doc """
     Listen for incoming connections on the given port, or port 31013 by default.
   """
-  @spec listen(atom, integer, integer) :: {:ok, pid} | {:error, String.t}
-  def listen(router, port \\ 31013, handlers \\ 10) do
-    Pico.Client.Supervisor.start_link(router, port, handlers)
+  @spec start(atom, list, integer, integer) :: {:ok, pid} | {:error, String.t}
+  def start(router, peers \\ [], port \\ 31013, handlers \\ 10) do
+    Pico.Client.Supervisor.start_link({router, peers, port, handlers})
   end
 
-  def stop_listening(pid), do: Pico.Client.Supervisor.stop(pid)
+  def start, do: {:error, "No router specified for Pico handler."}
 
-  def listen do
-    {:error, "No router specified for Pico handler."}
+  def handlers, do: Pico.Client.Supervisor.handlers()
+
+  def connected_handlers, do: Pico.Client.Supervisor.connected_handlers()
+
+  def listen(handler_pid), do: Pico.Client.Handler.accept_inbound_connection(handler_pid)
+
+  def listen_all_handlers do
+    Pico.handlers() |> Enum.each(fn {_, pid} -> Pico.listen(pid) end)
+  end
+
+  def broadcast(opname, data \\ nil) do
+    Enum.each(connected_handlers(), fn {_, pid} ->
+      Pico.Client.Handler.message_peer(pid, opname, data)
+    end)
   end
 
   @doc """

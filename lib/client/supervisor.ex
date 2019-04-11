@@ -1,28 +1,41 @@
 defmodule Pico.Client.Supervisor do
   use Supervisor
 
-  def start_link(router, port, handlers) do
-    Supervisor.start_link(__MODULE__, {router, port, handlers}, name: __MODULE__)
+  def start_link({router, peers, port, handlers}) do
+    Supervisor.start_link(__MODULE__, {router, port, handlers, peers}, name: __MODULE__)
   end
 
-  def init({router, port, handlers}) do
+  def init({router, port, handlers, peers}) do
     case :gen_tcp.listen(port, [:binary, reuseaddr: true, active: false, packet: 4]) do
       {:ok, socket} ->
-        handlers = generate_handlers(socket, router, handlers)
+        handlers = generate_handlers(socket, router, handlers, peers)
         Supervisor.init(handlers, strategy: :one_for_one)
 
-      _ -> :error
+      e -> e
     end
   end
 
-  def stop(pid) do
-    [{_, child_pid, _, _} | _rest] = Supervisor.which_children(pid)
-
-    r = GenServer.call(child_pid, :close_socket)
-    IO.inspect(r, label: "Res")
+  def handlers do
+    __MODULE__
+    |> Process.whereis()
+    |> Supervisor.which_children()
+    |> Enum.map(fn {name, pid, _, _} -> {name, pid} end)
   end
 
-  defp generate_handlers(socket, router, count) do
+  def connected_handlers do
+    __MODULE__
+    |> Process.whereis()
+    |> Supervisor.which_children()
+    |> Enum.filter(fn {_, pid, _, _} ->
+      pid
+      |> Process.info()
+      |> Keyword.get(:dictionary)
+      |> Keyword.has_key?(:connected)
+    end)
+    |> Enum.map(fn {name, pid, _, _} -> {name, pid} end)
+  end
+
+  defp generate_handlers(socket, router, count, peers) do
     for i <- 1..count do
       handler_name = :"PicoHandler#{i}"
 
@@ -31,7 +44,7 @@ defmodule Pico.Client.Supervisor do
           start: {
             Pico.Client.Handler,
             :start_link,
-            [socket, router, handler_name]
+            [socket, router, handler_name, i, peers]
           },
           type: :worker,
           restart: :permanent
