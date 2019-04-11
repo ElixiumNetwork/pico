@@ -72,6 +72,7 @@ defmodule Pico.Client.Handler do
           {ip, port} = Enum.at(peers, state.handler_number - 1)
           GenServer.cast(state.handler_name, {:attempt_outbound_connection, ip, port})
         else
+          Logger.info("#{state.handler_name}: No available peers. Starting listener instead.")
           GenServer.cast(state.handler_name, :accept_inbound_connection)
         end
     end
