@@ -1,5 +1,6 @@
 defmodule Pico.Client.Handler do
   alias Pico.Protocol.Decoder
+  alias Pico.Client.SharedState
   use GenServer
   require IEx
   require Logger
@@ -49,7 +50,7 @@ defmodule Pico.Client.Handler do
 
     {opname, data} = Decoder.decode(message, state.key, state.iv)
 
-    apply(state.router, :message, [opname, data, state])
+    apply(state.router, :message, [opname, data, {state.socket, state.key, state.iv}])
 
     # Set back to true to enable handler to capture messages
     :inet.setopts(state.socket, active: true)
@@ -58,6 +59,7 @@ defmodule Pico.Client.Handler do
 
   def handle_info({:tcp_closed, _}, state) do
     Logger.info("Lost connection from peer: #{state.peername}. TCP closed")
+    SharedState.remove_connection(state.handler_name)
     Process.exit(self(), :normal)
   end
 
@@ -86,7 +88,7 @@ defmodule Pico.Client.Handler do
     {key, iv} = authenticate_inbound(socket, state.router)
 
     peername = get_peername(socket)
-    Process.put(:connected, peername)
+    SharedState.add_connection(state.handler_name, peername)
 
     state = Map.merge(state, %{
       socket: socket,
@@ -108,7 +110,7 @@ defmodule Pico.Client.Handler do
         {key, iv} = authenticate_outbound(socket)
 
         peername = get_peername(socket)
-        Process.put(:connected, peername)
+        SharedState.add_connection(state.handler_name, peername)
 
         state = Map.merge(state, %{
           socket: socket,

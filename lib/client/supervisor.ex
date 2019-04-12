@@ -1,15 +1,17 @@
 defmodule Pico.Client.Supervisor do
   use Supervisor
+  alias Pico.Client.SharedState
 
-  def start_link({router, peers, port, handlers}) do
-    Supervisor.start_link(__MODULE__, {router, port, handlers, peers}, name: __MODULE__)
+  def start_link(args) do
+    SharedState.start_link()
+    Supervisor.start_link(__MODULE__, args, name: __MODULE__)
   end
 
-  def init({router, port, handlers, peers}) do
+  def init({router, peers, port, handlers}) do
     case :gen_tcp.listen(port, [:binary, reuseaddr: true, active: false, packet: 4]) do
       {:ok, socket} ->
         handlers = generate_handlers(socket, router, handlers, peers)
-        Supervisor.init(handlers, strategy: :one_for_one)
+        Supervisor.init(handlers, strategy: :one_for_one, max_restarts: length(handlers))
 
       e -> e
     end
@@ -19,19 +21,6 @@ defmodule Pico.Client.Supervisor do
     __MODULE__
     |> Process.whereis()
     |> Supervisor.which_children()
-    |> Enum.map(fn {name, pid, _, _} -> {name, pid} end)
-  end
-
-  def connected_handlers do
-    __MODULE__
-    |> Process.whereis()
-    |> Supervisor.which_children()
-    |> Enum.filter(fn {_, pid, _, _} ->
-      pid
-      |> Process.info()
-      |> Keyword.get(:dictionary)
-      |> Keyword.has_key?(:connected)
-    end)
     |> Enum.map(fn {name, pid, _, _} -> {name, pid} end)
   end
 

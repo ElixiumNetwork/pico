@@ -1,5 +1,6 @@
 defmodule Pico do
   alias Pico.Protocol.Encoder
+  alias Pico.Client.SharedState
   @moduledoc """
   Documentation for Pico.
   """
@@ -55,7 +56,7 @@ defmodule Pico do
 
   def handlers, do: Pico.Client.Supervisor.handlers()
 
-  def connected_handlers, do: Pico.Client.Supervisor.connected_handlers()
+  def connected_handlers, do: SharedState.connections()
 
   def listen(handler_pid), do: Pico.Client.Handler.accept_inbound_connection(handler_pid)
 
