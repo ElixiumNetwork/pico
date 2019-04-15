@@ -32,7 +32,7 @@ defmodule Pico.Client.Handler do
   end
 
   def message_peer(handler, opname, data) do
-    GenServer.call(handler, {:message_peer, opname, data})
+    GenServer.cast(handler, {:message_peer, opname, data})
   end
 
   @spec read_single_message(pid, binary) :: {String.t, map | nil}
@@ -138,14 +138,14 @@ defmodule Pico.Client.Handler do
     end
   end
 
-  def handle_call({:message_peer, opname, data}, _from, state) do
+  def handle_cast({:message_peer, opname, data}, state) do
     if data do
       Pico.message({state.socket, state.key, state.iv}, opname, data)
     else
       Pico.message({state.socket, state.key, state.iv}, opname)
     end
 
-    {:reply, :ok, state}
+    {:noreply, state}
   end
 
   @spec authenticate_inbound(pid, atom) :: {binary, binary} | {:error, :closed}
