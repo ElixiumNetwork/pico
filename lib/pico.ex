@@ -65,7 +65,7 @@ defmodule Pico do
   end
 
   def broadcast(opname, data \\ nil) do
-    Enum.each(connected_handlers(), fn {_, pid} ->
+    Enum.each(connected_handlers(), fn {pid, _} ->
       Pico.Client.Handler.message_peer(pid, opname, data)
     end)
   end
