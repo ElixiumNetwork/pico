@@ -36,9 +36,9 @@ defmodule Pico.Client.Handler do
   end
 
   @spec read_single_message(pid, binary) :: {String.t, map | nil}
-  def read_single_message(socket, secret \\ nil) do
+  def read_single_message(socket, key \\ nil, iv \\ nil) do
     case :gen_tcp.recv(socket, 0) do
-      {:ok, message} -> Decoder.decode(message, secret)
+      {:ok, message} -> Decoder.decode(message, key, iv)
       {:error, :closed} -> Process.exit(self(), :normal)
     end
   end
@@ -97,9 +97,11 @@ defmodule Pico.Client.Handler do
       peername: peername
     })
 
-    :inet.setopts(socket, active: true)
-
     Logger.info("#{state.handler_name}: Authenticated with peer at #{peername}")
+
+    apply(state.router, :message, ["NEW_INBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}])
+
+    :inet.setopts(socket, active: true)
 
     {:noreply, state}
   end
@@ -119,9 +121,11 @@ defmodule Pico.Client.Handler do
           peername: peername
         })
 
-        :inet.setopts(socket, active: true)
-
         Logger.info("#{state.handler_name}: Authenticated with peer at #{peername}")
+
+        apply(state.router, :message, ["NEW_OUTBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}])
+
+        :inet.setopts(socket, active: true)
 
         {:noreply, state}
 
