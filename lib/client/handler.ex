@@ -2,13 +2,16 @@ defmodule Pico.Client.Handler do
   alias Pico.Protocol.Decoder
   alias Pico.Client.SharedState
   use GenServer
-  require IEx
   require Logger
 
+  @moduledoc false
+
+  @spec start_link(pid, atom, atom, integer, list(tuple)) :: {:ok, pid}
   def start_link(socket, router, handler_name, handler_number, peers) do
     GenServer.start_link(__MODULE__, [socket, router, handler_name, handler_number, peers], name: handler_name)
   end
 
+  @spec init(list) :: {:ok, map}
   def init([socket, router, handler_name, handler_number, peers]) do
     Process.send_after(self(), :start_connection, 1000)
 
@@ -23,14 +26,17 @@ defmodule Pico.Client.Handler do
     }
   end
 
+  @spec accept_inbound_connection(pid) :: none
   def accept_inbound_connection(handler) do
     GenServer.cast(handler, :accept_inbound_connection)
   end
 
+  @spec attempt_outbound_connection(pid, charlist, integer) :: none
   def attempt_outbound_connection(handler, ip, port \\ 31013) do
     GenServer.cast(handler, {:attempt_outbound_connection, ip, port})
   end
 
+  @spec message_peer(pid, String.t, map) :: none
   def message_peer(handler, opname, data) do
     GenServer.cast(handler, {:message_peer, opname, data})
   end
@@ -50,7 +56,7 @@ defmodule Pico.Client.Handler do
 
     {opname, data} = Decoder.decode(message, state.key, state.iv)
 
-    apply(state.router, :message, [opname, data, {state.socket, state.key, state.iv}])
+    apply(state.router, :message, [opname, data, {state.socket, state.key, state.iv}, state])
 
     # Set back to true to enable handler to capture messages
     :inet.setopts(state.socket, active: true)
@@ -99,7 +105,7 @@ defmodule Pico.Client.Handler do
 
     Logger.info("#{state.handler_name}: Authenticated with peer at #{peername}")
 
-    apply(state.router, :message, ["NEW_INBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}])
+    apply(state.router, :message, ["NEW_INBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}, state])
 
     :inet.setopts(socket, active: true)
 
@@ -123,7 +129,7 @@ defmodule Pico.Client.Handler do
 
         Logger.info("#{state.handler_name}: Authenticated with peer at #{peername}")
 
-        apply(state.router, :message, ["NEW_OUTBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}])
+        apply(state.router, :message, ["NEW_OUTBOUND_CONNECTION", nil, {state.socket, state.key, state.iv}, state])
 
         :inet.setopts(socket, active: true)
 
@@ -157,6 +163,7 @@ defmodule Pico.Client.Handler do
     {key, iv}
   end
 
+  @spec authenticate_outbound(pid) :: {binary, binary} | {:error, any}
   defp authenticate_outbound(socket) do
     {prime, generator} = Strap.prime_group(1024)
     identifier = :crypto.strong_rand_bytes(32)

@@ -1,5 +1,13 @@
 defmodule Pico.Protocol.Encoder do
+  @moduledoc """
+    Encode Pico messages
+  """
 
+  @doc """
+    Encode an unencrypted message in Pico format given an OpName and an optional data
+    map
+  """
+  @spec encode(String.t, binary) :: binary | {:error, String.t}
   def encode(opname, _) when not is_binary(opname) do
     {:error, "OpName must be a string"}
   end
@@ -11,6 +19,11 @@ defmodule Pico.Protocol.Encoder do
     encode_formatted(opname, formatted_data)
   end
 
+  @doc """
+    Encode and encrypt a message in Pico format given an OpName and an optional
+    data map
+  """
+  @spec encode(String.t, map | binary, binary, binary) :: binary | {:error, String.t}
   def encode(opname, _, _, _) when not is_binary(opname) do
     {:error, "OpName must be a string"}
   end
@@ -23,8 +36,9 @@ defmodule Pico.Protocol.Encoder do
     encode_formatted(opname, formatted_data, key, iv)
   end
 
+  @spec encode_formatted(String.t, binary, binary, binary) :: binary
   defp encode_formatted(opname, data, key, iv) do
-    body = Pico.Utilities.pad(opname <> "|" <> data, 32)
+    body = opname <> "|" <> data
 
     {major, minor} = Application.get_env(:pico, :protocol_version)
 
@@ -35,6 +49,7 @@ defmodule Pico.Protocol.Encoder do
     "PICO" <> version <> ciphertag <> encrypted_body
   end
 
+  @spec encode_formatted(String.t, binary) :: binary
   defp encode_formatted(opname, data) do
     body = opname <> "|" <> data
 

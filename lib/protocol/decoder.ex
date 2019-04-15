@@ -1,5 +1,15 @@
 defmodule Pico.Protocol.Decoder do
+  @type message :: {String.t, map}
 
+  @moduledoc """
+    Decode Pico messages
+  """
+
+  @doc """
+    Given an encoded Pico message, decode it (using the associated key and iv,
+    if encrypted)
+  """
+  @spec decode(binary, binary, binary) :: message
   def decode(msg, secret \\ nil, iv \\ nil)
 
   def decode(<<"PICO", major_b::bytes-size(1), minor_b::bytes-size(1), ciphertag::bytes-size(16), body::binary>>, key, iv) do
@@ -27,8 +37,6 @@ defmodule Pico.Protocol.Decoder do
     {opname, data}
   end
 
-  def decode(s, _, _) do
-    {:error, :protocol_mismatch}
-  end
+  def decode(_, _, _), do: {:error, :protocol_mismatch}
 
 end

@@ -1,8 +1,11 @@
 defmodule Pico.Client.Router do
+  @moduledoc """
+    Provides a DSL for message routing
+  """
 
   defmacro message(opname, data, do: block) do
     quote generated: true do
-      def message(unquote(opname), unquote(data), var!(conn)) do
+      def message(unquote(opname), unquote(data), var!(conn), var!(handler_state)) do
         unquote(block)
       end
     end
@@ -13,12 +16,12 @@ defmodule Pico.Client.Router do
       import Pico.Client.Router
       alias Pico.Client.SharedState
 
-      def message(opname, _data, _conn) do
+      def message(opname, _data, _conn, _handler_state) do
         IO.puts "Received unknown message #{opname}. Terminating connection"
         Process.exit(self(), :normal)
       end
 
-      defoverridable [message: 3]
+      defoverridable [message: 4]
 
       def message("HANDSHAKE", data, socket) do
         %{
