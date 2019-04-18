@@ -13,6 +13,7 @@ defmodule Pico.Client.Handler do
 
   @spec init(list) :: {:ok, map}
   def init([socket, router, handler_name, handler_number, peers]) do
+    Process.flag(:trap_exit, true)
     Process.send_after(self(), :start_connection, 1000)
 
     {:ok,
@@ -66,7 +67,16 @@ defmodule Pico.Client.Handler do
   def handle_info({:tcp_closed, _}, state) do
     Logger.info("Lost connection from peer: #{state.peername}. TCP closed")
     SharedState.remove_connection(state.handler_name)
-    Process.exit(self(), :normal)
+    abort_connection(:tcp_closed)
+
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _pid, :normal}, state) do
+    SharedState.remove_connection(state.handler_name)
+
+    exit(:normal)
+    {:noreply, state}
   end
 
   def handle_info(:start_connection, state) do
@@ -78,7 +88,15 @@ defmodule Pico.Client.Handler do
       peers ->
         if length(peers) >= state.handler_number do
           {ip, port} = Enum.at(peers, state.handler_number - 1)
-          GenServer.cast(state.handler_name, {:attempt_outbound_connection, ip, port})
+
+          existing_connections = Enum.map(Pico.connected_handlers(), fn {_, ip} -> ip end)
+
+          if to_string(ip) in existing_connections do
+            Logger.info("#{state.handler_name}: Connection already exists to #{ip}. Starting listener instead")
+            GenServer.cast(state.handler_name, :accept_inbound_connection)
+          else
+            GenServer.cast(state.handler_name, {:attempt_outbound_connection, ip, port})
+          end
         else
           Logger.info("#{state.handler_name}: No available peers. Starting listener instead.")
           GenServer.cast(state.handler_name, :accept_inbound_connection)
@@ -91,9 +109,13 @@ defmodule Pico.Client.Handler do
   def handle_cast(:accept_inbound_connection, state) do
     {:ok, socket} = :gen_tcp.accept(state.listen_socket)
 
+    peername = get_peername(socket)
+    existing_connections = Enum.map(Pico.connected_handlers(), fn {_, ip} -> ip end)
+
+    if peername in existing_connections, do: abort_connection(:conn_exists)
+
     {key, iv} = authenticate_inbound(socket, state.router)
 
-    peername = get_peername(socket)
     SharedState.add_connection(state.handler_name, peername)
 
     state = Map.merge(state, %{
@@ -200,6 +222,16 @@ defmodule Pico.Client.Handler do
     addr
     |> :inet_parse.ntoa()
     |> to_string()
+  end
+
+  @spec abort_connection(atom) :: none
+  defp abort_connection(reason) do
+    case reason do
+      :conn_exists -> Logger.info("Aborting connection attempt, another handler is already connected to this IP")
+      _ -> nil
+    end
+
+    Process.exit(self(), :normal)
   end
 
 end

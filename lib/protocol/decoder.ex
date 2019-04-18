@@ -16,7 +16,7 @@ defmodule Pico.Protocol.Decoder do
     <<major::integer-8-unsigned>> = major_b
     <<minor::integer-8-unsigned>> = minor_b
 
-    {version, _} = Float.parse("#{major}.#{minor}")
+    # {_version, _} = Float.parse("#{major}.#{minor}")
 
     body =
       if key do

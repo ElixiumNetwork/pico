@@ -7,24 +7,40 @@ defmodule Pico.MixProject do
       version: "0.1.0",
       elixir: "~> 1.7",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      name: "Pico",
+      description: "An implementation of the Pico zero-knowledge peer to peer protocol",
+      source_url: "https://github.com/ElixiumNetwork/pico",
+      package: package()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [
+        :logger,
+        :crypto
+      ],
       env: [
         protocol_version: {1, 0}
       ]
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-        {:strap, "~> 0.1.1"}
+        {:strap, "~> 0.1.1"},
+        {:ex_doc, "~> 0.19", only: :dev, runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      name: "pico",
+      files: ["lib", "mix.exs", "README*"],
+      maintainers: ["Alex Dovzhanyn"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/ElixiumNetwork/pico"}
     ]
   end
 end
